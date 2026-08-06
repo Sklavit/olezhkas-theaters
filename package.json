@@ -1,0 +1,10 @@
+{
+  "name": "olezhkas-theaters",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Olezka's Theaters — a family show calendar",
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^10.7.12"
+  }
+}

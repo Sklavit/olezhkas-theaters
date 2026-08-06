@@ -1,6 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Olezka's Theaters</title>
+<meta name="description" content="A family show calendar — what is on, who is coming.">
+<meta name="theme-color" content="#8E1116">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Olezka's Theaters">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127917;</text></svg>">
 <style>
   :root{
     --bg:#8E1116;
@@ -232,15 +241,18 @@
     *{animation:none!important;transition:none!important}
   }
 </style>
+</head>
+<body>
 
 <div id="app"></div>
 
 <script>
 /* ============================================================
    Olezka's Theaters — a family show calendar
-   Built from a handwritten brief. Everything is stored in the
-   artifact's shared storage so the whole family sees the same
-   calendar and the same message inbox.
+   Built from a handwritten brief. The calendar, the messages and the
+   passcodes live on the server, so the whole family sees the same
+   thing. The colour you pick and who you are signed in as stay on
+   your own device.
    ============================================================ */
 
 const K = {
@@ -273,17 +285,46 @@ let state = {
   toast:null
 };
 
-/* ---------- storage helpers ---------- */
+/* ---------- storage helpers ----------
+   shared = true  -> the whole family, kept on the server (Netlify Blobs,
+                     via the /api/storage function)
+   shared = false -> this browser only, kept in localStorage. That is the
+                     right home for the theme and for who is logged in on
+                     this device: those are meant to differ per person.
+   ------------------------------------ */
+const API = '/api/storage';
+const deviceKey = key => `olezka:${key}`;
+
 async function load(key, shared, fallback){
   try{
-    const r = await window.storage.get(key, shared);
-    return r && r.value ? JSON.parse(r.value) : fallback;
-  }catch(e){ return fallback; }
+    if(!shared){
+      const raw = localStorage.getItem(deviceKey(key));
+      return raw ? JSON.parse(raw) : fallback;
+    }
+    const r = await fetch(`${API}?key=${encodeURIComponent(key)}`, { cache:'no-store' });
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const body = await r.json();
+    return body.value ? JSON.parse(body.value) : fallback;
+  }catch(e){
+    // A shared read that fails means we cannot trust an empty result — say so,
+    // rather than letting the app decide the theatre has never been set up.
+    if(shared) state.storageOK = false;
+    return fallback;
+  }
 }
 async function save(key, value, shared){
   try{
-    const r = await window.storage.set(key, JSON.stringify(value), shared);
-    if(!r) throw new Error('no result');
+    if(!shared){
+      localStorage.setItem(deviceKey(key), JSON.stringify(value));
+      return true;
+    }
+    const r = await fetch(`${API}?key=${encodeURIComponent(key)}`, {
+      method:'PUT',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(value)
+    });
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    state.storageOK = true;
     return true;
   }catch(e){
     state.storageOK = false;
@@ -421,6 +462,19 @@ function screenSetup(){
       <input id="vc" type="text" placeholder="e.g. 9999" maxlength="24">
       <div class="row" style="margin-top:20px"><button class="btn solid" data-act="setup">Open the theatre</button></div>
       <p class="note" id="setupErr"></p>
+    </div>
+  </div></div>`;
+}
+
+/* --- the server could not be reached --- */
+function screenOffline(){
+  return `<div class="wrap"><div class="center">
+    ${marqueeSign()}
+    <div class="panel" style="margin-top:26px">
+      <h2 style="font-family:var(--display);font-size:22px">The doors are stuck</h2>
+      <p class="note">We could not reach the theatre to find out what is on. That is usually the
+      internet rather than you. Nothing has been lost — try again in a moment.</p>
+      <div class="row" style="margin-top:20px"><button class="btn solid" data-act="retry">Try again</button></div>
     </div>
   </div></div>`;
 }
@@ -663,7 +717,10 @@ function render(){
   if(!state.ready){ app.innerHTML = `<div class="wrap"><div class="center"><p class="hint">Opening the doors…</p></div></div>`; return; }
 
   let html;
-  if(!state.settings)      html = screenSetup();
+  // No settings *and* a failed read is not the same as a new theatre — showing
+  // setup there would let anyone reset the passcodes during an outage.
+  if(!state.settings && !state.storageOK) html = screenOffline();
+  else if(!state.settings) html = screenSetup();
   else if(!state.user)     html = screenLogin();
   else {
     const body = state.view === 'colors'   ? viewColors()
@@ -715,6 +772,13 @@ document.addEventListener('click', async (e) => {
       render();
       break;
     }
+
+    case 'retry':
+      state.storageOK = true;
+      state.ready = false;
+      render();
+      await boot();
+      break;
 
     case 'logout':
       state.user = null;
@@ -883,3 +947,6 @@ document.addEventListener('keydown', (e) => {
 
 boot();
 </script>
+
+</body>
+</html>
