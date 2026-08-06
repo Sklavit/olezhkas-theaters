@@ -6,7 +6,9 @@ before it can live on the web as our home website.
 
 > **Status.** §2 is done — the file is now a proper HTML document, `window.storage`
 > has been replaced with a Netlify Blobs backend, and the app is deployable (see
-> [README.md](README.md)). §3 and §4 still stand, except where marked.
+> [README.md](README.md)). §3 is done: the client-side passcode check has been
+> replaced with signed sessions checked in the function. §4 still stands, except
+> where marked.
 
 ---
 
@@ -102,7 +104,18 @@ kids' iPads) is a five-minute job that should happen before anything else.
 
 ---
 
-## 3. Security — fine for family, do not oversell it
+## 3. Security — fine for family, do not oversell it — *addressed*
+
+> Rewritten since. The passcodes are salted and hashed with PBKDF2 and never
+> leave the function; sign-in returns an HMAC-signed token carrying name and
+> role; every read and write checks that token, and owner-only routes check the
+> role. A visitor's two legitimate writes got their own narrow routes — an RSVP
+> changes only that person's reply, and a message appends — so neither needs
+> write access to the calendar or the inbox. Theatres created before this change
+> keep working: the first successful sign-in upgrades the stored record in
+> place, leaving shows, RSVPs, messages and the name untouched. What remains
+> true is the last line below — this is a lock on the door, not a vault. Kept
+> below as the record of why.
 
 The file's own copy is honest about this ("it is not bank-level security"), and
 that framing is right. Stated plainly:
@@ -144,6 +157,13 @@ The `rsvp` handler is the only one that gets this right — it re-reads before
 mutating (line 799), with a comment explaining why. That fix should be applied to
 the other five handlers, or better, replaced with per-record writes once there is a
 backend.
+
+> **Partly fixed.** The two paths a visitor uses are now per-record writes handled
+> in the function: `POST /api/rsvp` changes one person's reply, `POST /api/message`
+> appends one message. Neither can clobber anything. The owner's paths —
+> `PUT /api/shows` and `PUT /api/messages` — still send the whole array from a
+> possibly stale page, so this bug survives wherever two owners, or one owner in
+> two tabs, are editing. Still the next thing worth fixing.
 
 ### 4.2 A toast timeout wipes what you are typing
 
