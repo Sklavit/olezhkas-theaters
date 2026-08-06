@@ -10,7 +10,7 @@ Built to run on Netlify: a static page plus one small function.
 | Path | What it is |
 | --- | --- |
 | `public/index.html` | The whole app. One file, no build step, no framework. |
-| `netlify/functions/storage.mjs` | Reads and writes the shared data (Netlify Blobs). |
+| `netlify/functions/api.mjs` | The back office: signing in, and every read and write of shared data. |
 | `netlify.toml` | Publish directory, function directory, a few headers. |
 | `ANALYSIS.md` | Review of the app: features, bugs, security notes. |
 
@@ -18,12 +18,40 @@ Built to run on Netlify: a static page plus one small function.
 
 | What | Where it lives | Who sees it |
 | --- | --- | --- |
-| Shows, messages, theatre name + passcodes | Netlify Blobs, via `/api/storage` | everyone |
-| Chosen colour, who is signed in on this device | `localStorage` | just that browser |
+| Shows, messages, theatre name | Netlify Blobs, behind `/api` | signed-in family only |
+| The two passcodes | Netlify Blobs, salted + hashed | nobody, including us |
+| Chosen colour, your sign-in token | `localStorage` | just that browser |
 
 That split is deliberate: the calendar has to be the same for the whole family,
 but the colour is meant to be personal, and signing in on the tablet should not
 sign anyone out on the phone.
+
+## Signing in
+
+Nothing shared can be read or written without a token, and the browser is never
+told the passcodes.
+
+1. You type a name and a passcode. They go to `POST /api/login`.
+2. The function compares the code against a PBKDF2 hash — the codes are never
+   stored in the clear, so even someone reading the blob store cannot recover
+   them.
+3. It returns a token: your name and role, signed with HMAC-SHA256. Changing a
+   single character of it makes it invalid, so nobody can promote themselves to
+   owner.
+4. Every later call carries that token. The function checks it, and checks the
+   role: only the owner can change the calendar, the inbox or the passcodes.
+   The token lasts 30 days.
+
+Two things are deliberately not simple writes: an RSVP goes through
+`POST /api/rsvp`, which changes only *your* reply on the server, and a message
+goes through `POST /api/message`, which appends. So a visitor can reply and can
+write to the owner, but cannot rewrite the calendar or wipe the inbox.
+
+The signing key comes from the `THEATER_SECRET` environment variable if you set
+one. If you don't, the function makes one on first use and keeps it in the blob
+store, so a fresh deploy needs no configuration. Setting `THEATER_SECRET` (Site
+configuration → Environment variables) is still worth doing: changing it signs
+everyone out, which is how you evict a device you no longer trust.
 
 ---
 
@@ -59,13 +87,15 @@ something the family can type: `olezkas-theaters.netlify.app`.
 ### Check the function came up
 
 ```sh
-curl https://YOUR-SITE.netlify.app/api/storage?key=theater:shows
+curl -X POST https://YOUR-SITE.netlify.app/api/hello
+curl https://YOUR-SITE.netlify.app/api/data
 ```
 
-- `{"value":null}` — working, nothing saved yet. This is what you want on day one.
-- `{"value":"[...]"}` — working, with shows saved.
+- `{"needsSetup":true,...}` then `{"error":"sign in again"}` — exactly right. The
+  first call is the only thing an unauthenticated caller is allowed to learn; the
+  second shows the data is shut.
 - `404` — the function did not deploy. Check **Deploys → the latest deploy →
-  Functions** and confirm `storage` is listed.
+  Functions** and confirm `api` is listed.
 
 ### The bit not to forget: claim the theatre
 
@@ -104,12 +134,15 @@ stuck".
 
 ## Things to know before sharing the link
 
-- **The data endpoint is open.** Anyone who knows your site URL can read or
-  overwrite the calendar by calling `/api/storage` directly — including reading
-  the passcodes, which are stored in plain text. The passcodes gate the *screens*,
-  not the data. For a family calendar on an unlisted URL that is a reasonable
-  trade; do not put anything private on the page. `noindex` is set so search
-  engines stay away.
+- **Pick a passcode worth having.** Everything now rests on it. The function
+  pauses before answering a wrong one, but that is a speed bump, not rate
+  limiting — a four-digit code is still guessable by someone patient. A couple of
+  words is plenty and no harder for a child to remember.
+- **A token is as good as the passcode for 30 days.** It sits in `localStorage`
+  on whatever device signed in. If a device is lost, change the passcodes — or
+  change `THEATER_SECRET`, which signs out everyone at once.
+- **Anyone can still learn the theatre's name** from `/api/hello`. That is all an
+  unauthenticated caller can get; `noindex` is set so search engines stay away.
 - **The page does not refresh itself.** It loads everything once when opened. If
   Dad adds a show while your tab is open, you will not see it until you reload.
   Worse, saving from a stale tab can overwrite what someone else added in the

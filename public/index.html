@@ -256,11 +256,8 @@
    ============================================================ */
 
 const K = {
-  shows:    'theater:shows',
-  messages: 'theater:messages',
-  settings: 'theater:settings',
-  theme:    'theater:theme',
-  session:  'theater:session'
+  theme: 'theater:theme',      // this browser only
+  token: 'olezka:token'        // this browser only — proves who we are to /api
 };
 
 const THEMES = {
@@ -285,50 +282,82 @@ let state = {
   toast:null
 };
 
-/* ---------- storage helpers ----------
-   shared = true  -> the whole family, kept on the server (Netlify Blobs,
-                     via the /api/storage function)
-   shared = false -> this browser only, kept in localStorage. That is the
-                     right home for the theme and for who is logged in on
-                     this device: those are meant to differ per person.
-   ------------------------------------ */
-const API = '/api/storage';
+/* ---------- talking to the theatre ----------
+   Everything shared goes through /api, and every call carries the token we
+   were given at sign-in. The passcodes never come back down the wire.
+   The colour you picked stays here in the browser: it is meant to be yours
+   alone, and the server has no business knowing it.
+   -------------------------------------------- */
 const deviceKey = key => `olezka:${key}`;
 
-async function load(key, shared, fallback){
+function loadLocal(key, fallback){
   try{
-    if(!shared){
-      const raw = localStorage.getItem(deviceKey(key));
-      return raw ? JSON.parse(raw) : fallback;
-    }
-    const r = await fetch(`${API}?key=${encodeURIComponent(key)}`, { cache:'no-store' });
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    const body = await r.json();
-    return body.value ? JSON.parse(body.value) : fallback;
-  }catch(e){
-    // A shared read that fails means we cannot trust an empty result — say so,
-    // rather than letting the app decide the theatre has never been set up.
-    if(shared) state.storageOK = false;
-    return fallback;
-  }
+    const raw = localStorage.getItem(deviceKey(key));
+    return raw ? JSON.parse(raw) : fallback;
+  }catch(e){ return fallback; }
 }
-async function save(key, value, shared){
+function saveLocal(key, value){
+  try{ localStorage.setItem(deviceKey(key), JSON.stringify(value)); }catch(e){}
+}
+function getToken(){
+  try{ return localStorage.getItem(K.token); }catch(e){ return null; }
+}
+function setToken(t){
+  try{ t ? localStorage.setItem(K.token, t) : localStorage.removeItem(K.token); }catch(e){}
+}
+
+async function api(path, { method='GET', body } = {}){
+  const headers = {};
+  const token = getToken();
+  if(token) headers['Authorization'] = `Bearer ${token}`;
+  if(body !== undefined) headers['Content-Type'] = 'application/json';
+
+  let r;
   try{
-    if(!shared){
-      localStorage.setItem(deviceKey(key), JSON.stringify(value));
-      return true;
-    }
-    const r = await fetch(`${API}?key=${encodeURIComponent(key)}`, {
-      method:'PUT',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify(value)
+    r = await fetch(`/api${path}`, {
+      method, headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: 'no-store'
     });
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    state.storageOK = true;
+  }catch(e){
+    // Never reached the theatre at all.
+    throw Object.assign(new Error('Could not reach the theatre'), { offline:true });
+  }
+
+  let data = {};
+  try{ data = await r.json(); }catch(e){}
+
+  if(r.status === 401){
+    // The token expired or was tampered with: this device is signed out.
+    setToken(null);
+    state.user = null;
+    throw Object.assign(new Error(data.error || 'Please sign in again'), { status:401 });
+  }
+  if(!r.ok) throw Object.assign(new Error(data.error || `Something went wrong (${r.status})`), { status:r.status, data });
+  state.storageOK = true;
+  return data;
+}
+
+/* Pull the shared world down fresh. */
+async function refresh(){
+  const d = await api('/data');
+  state.user     = d.me;
+  state.settings = { houseName: d.houseName };
+  state.shows    = d.shows || [];
+  state.messages = d.messages || [];
+}
+
+/* Every action funnels through here so one place decides what a failure
+   looks like: signed out, refused, or the theatre being unreachable. */
+async function attempt(fn, okMsg){
+  try{
+    await fn();
+    okMsg ? toast(okMsg) : render();
     return true;
   }catch(e){
-    state.storageOK = false;
-    toast('Could not save — check your connection');
+    if(e.status === 401){ toast('Please sign in again'); render(); }
+    else if(e.offline){ state.storageOK = false; toast('Could not reach the theatre'); }
+    else toast(e.message);
     return false;
   }
 }
@@ -408,14 +437,32 @@ function applyTheme(){
 
 /* ---------- boot ---------- */
 async function boot(){
-  state.settings = await load(K.settings, true, null);
-  state.shows    = await load(K.shows, true, []);
-  state.messages = await load(K.messages, true, []);
-  state.theme    = await load(K.theme, false, 'red');
-  state.user     = await load(K.session, false, null);
+  state.theme    = loadLocal(K.theme, 'red');
   state.selected = todayISO();
-  state.ready    = true;
   applyTheme();
+
+  try{
+    if(getToken()){
+      // Still signed in on this device — go straight in.
+      await refresh();
+    }else{
+      const h = await api('/hello', { method:'POST' });
+      state.user = null;
+      state.settings = h.needsSetup ? null : { houseName: h.houseName };
+    }
+  }catch(e){
+    if(e.status === 401){
+      // The token had expired. Fall back to the front door.
+      try{
+        const h = await api('/hello', { method:'POST' });
+        state.settings = h.needsSetup ? null : { houseName: h.houseName };
+      }catch(e2){ state.storageOK = false; }
+    }else{
+      state.storageOK = false;
+    }
+  }
+
+  state.ready = true;
   render();
 }
 
@@ -751,9 +798,12 @@ document.addEventListener('click', async (e) => {
       const err = document.getElementById('setupErr');
       if(!adminCode || !visitorCode){ err.textContent = 'Fill in both passcodes to continue.'; return; }
       if(adminCode === visitorCode){ err.textContent = 'The two passcodes need to be different.'; return; }
-      state.settings = { houseName, adminCode, visitorCode };
-      await save(K.settings, state.settings, true);
-      render();
+      try{
+        // The codes go up once and are hashed there. They are not kept here.
+        const r = await api('/setup', { method:'POST', body:{ houseName, adminCode, visitorCode } });
+        state.settings = { houseName: r.houseName };
+        render();
+      }catch(e){ err.textContent = e.message; }
       break;
     }
 
@@ -762,14 +812,15 @@ document.addEventListener('click', async (e) => {
       const code = document.getElementById('pc').value.trim();
       const err = document.getElementById('loginErr');
       if(!name){ err.textContent = 'Type your name first.'; return; }
-      let role = null;
-      if(code === state.settings.adminCode) role = 'admin';
-      else if(code === state.settings.visitorCode) role = 'visitor';
-      if(!role){ err.textContent = 'That passcode does not work. Try again.'; return; }
-      state.user = { name, role };
-      state.view = 'calendar';
-      await save(K.session, state.user, false);
-      render();
+      try{
+        // The theatre decides who you are — the browser is not told the codes.
+        const r = await api('/login', { method:'POST', body:{ name, code } });
+        if(r.needsSetup){ state.settings = null; render(); return; }
+        setToken(r.token);
+        state.view = 'calendar';
+        await refresh();
+        render();
+      }catch(e){ err.textContent = e.message; }
       break;
     }
 
@@ -781,8 +832,10 @@ document.addEventListener('click', async (e) => {
       break;
 
     case 'logout':
+      setToken(null);
       state.user = null;
-      await save(K.session, null, false);
+      state.shows = [];
+      state.messages = [];
       render();
       break;
 
@@ -836,8 +889,8 @@ document.addEventListener('click', async (e) => {
       state.selected = date;
       state.cursor = new Date(Number(date.slice(0,4)), Number(date.slice(5,7)) - 1, 1);
       state.modal = null;
-      await save(K.shows, state.shows, true);
-      toast(cur.id ? 'Show changed' : 'Show added');
+      await attempt(() => api('/shows', { method:'PUT', body:state.shows }),
+                    cur.id ? 'Show changed' : 'Show added');
       break;
     }
 
@@ -852,25 +905,28 @@ document.addEventListener('click', async (e) => {
       s.time = `${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
       state.selected = s.date;
       state.cursor = new Date(dt.getFullYear(), dt.getMonth(), 1);
-      await save(K.shows, state.shows, true);
-      toast(`Moved to ${prettyDate(s.date)} at ${prettyTime(s.time)}`);
+      await attempt(() => api('/shows', { method:'PUT', body:state.shows }),
+                    `Moved to ${prettyDate(s.date)} at ${prettyTime(s.time)}`);
       break;
     }
 
     case 'rsvp': {
       const id = el.dataset.id, val = el.dataset.val;
-      // Re-read first, so two people replying at once don't wipe each other out.
-      const fresh = await load(K.shows, true, state.shows);
-      const target = fresh.find(x => x.id === id);
-      if(!target){ state.shows = fresh; toast('That show is no longer on'); return; }
-      target.rsvps = target.rsvps || {};
-      const had = target.rsvps[state.user.name];
-      if(had === val) delete target.rsvps[state.user.name];
-      else target.rsvps[state.user.name] = val;
-      state.shows = fresh;
-      await save(K.shows, state.shows, true);
-      const labels = { yes:"You're going", maybe:'Marked as maybe', no:"Marked as can't come" };
-      toast(had === val ? 'Reply removed' : labels[val]);
+      // The theatre does the read-and-change, so two people replying at the
+      // same moment cannot wipe each other out. It hands back the new list.
+      let msg = '';
+      await attempt(async () => {
+        try{
+          const r = await api('/rsvp', { method:'POST', body:{ id, value:val } });
+          state.shows = r.shows;
+          const labels = { yes:"You're going", maybe:'Marked as maybe', no:"Marked as can't come" };
+          msg = r.removed ? 'Reply removed' : labels[val];
+        }catch(e){
+          if(e.status === 404){ state.shows = (e.data && e.data.shows) || state.shows; msg = 'That show is no longer on'; return; }
+          throw e;
+        }
+      });
+      if(msg) toast(msg);
       break;
     }
 
@@ -880,8 +936,7 @@ document.addEventListener('click', async (e) => {
       if(!confirm(`Delete "${s.title}"?`)) return;
       state.shows = state.shows.filter(x => x.id !== s.id);
       state.modal = null;
-      await save(K.shows, state.shows, true);
-      toast('Show deleted');
+      await attempt(() => api('/shows', { method:'PUT', body:state.shows }), 'Show deleted');
       break;
     }
 
@@ -889,43 +944,41 @@ document.addEventListener('click', async (e) => {
       const box = document.getElementById('mt');
       const text = box.value.trim();
       if(!text){ toast('Write something first'); return; }
-      state.messages.push({ id:uid(), from:state.user.name, text, at:Date.now(), read:false });
-      box.value = '';
-      await save(K.messages, state.messages, true);
-      toast('Message sent to the owner');
+      // Sent as one message rather than a whole inbox, so a visitor can add
+      // to it but never rewrite what is already there.
+      await attempt(() => api('/message', { method:'POST', body:{ text } }),
+                    'Message sent to the owner');
       break;
     }
 
     case 'read':
       state.messages = state.messages.map(m => m.id === el.dataset.id ? { ...m, read:true } : m);
-      await save(K.messages, state.messages, true);
-      render();
+      await attempt(() => api('/messages', { method:'PUT', body:state.messages }));
       break;
 
     case 'delmsg':
       state.messages = state.messages.filter(m => m.id !== el.dataset.id);
-      await save(K.messages, state.messages, true);
-      render();
+      await attempt(() => api('/messages', { method:'PUT', body:state.messages }));
       break;
 
     case 'theme':
       state.theme = el.dataset.theme;
       applyTheme();
-      await save(K.theme, state.theme, false);
+      saveLocal(K.theme, state.theme);
       render();
       break;
 
     case 'savesettings': {
       const houseName = document.getElementById('s_hn').value.trim() || "Olezka's Theaters";
-      // Empty means "keep the current one" — the fields start blank so the
-      // codes are never written into the page.
-      const adminCode = document.getElementById('s_ac').value.trim() || state.settings.adminCode;
-      const visitorCode = document.getElementById('s_vc').value.trim() || state.settings.visitorCode;
-      if(!adminCode || !visitorCode){ toast('Both passcodes are needed'); return; }
-      if(adminCode === visitorCode){ toast('The passcodes must be different'); return; }
-      state.settings = { houseName, adminCode, visitorCode };
-      await save(K.settings, state.settings, true);
-      toast('Saved');
+      // Blank means "keep the one you have" — the theatre fills in the gap,
+      // because this page has never been told what the codes are.
+      const adminCode = document.getElementById('s_ac').value.trim();
+      const visitorCode = document.getElementById('s_vc').value.trim();
+      if(adminCode && visitorCode && adminCode === visitorCode){ toast('The passcodes must be different'); return; }
+      await attempt(async () => {
+        const r = await api('/settings', { method:'PUT', body:{ houseName, adminCode, visitorCode } });
+        state.settings = { houseName: r.houseName };
+      }, 'Saved');
       break;
     }
 
