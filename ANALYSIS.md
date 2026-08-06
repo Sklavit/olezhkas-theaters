@@ -94,9 +94,12 @@ kids' iPads) is a five-minute job that should happen before anything else.
 The file's own copy is honest about this ("it is not bank-level security"), and
 that framing is right. Stated plainly:
 
-- Both passcodes are stored **in plaintext** in shared storage, and the owner's
-  settings page renders the owner passcode into an `<input value=...>`. Anyone who
-  can read shared storage — or who logs in as owner once — has everything.
+- Both passcodes are stored **in plaintext** in shared storage. Anyone who can read
+  shared storage has both of them.
+- The settings page used to render the live codes into `<input value=...>`, putting
+  them in the page source for anyone looking over the owner's shoulder. Fixed: the
+  fields are now blank `type="password"` inputs, and an empty box means "keep the
+  current code". The codes are no longer written into the DOM anywhere.
 - The `admin` / `visitor` split is **client-side only**. A visitor who opens
   devtools and sets `state.user.role = 'admin'` gets every owner button. With a
   real backend, writes to `theater:shows` would need server-side checking, or we

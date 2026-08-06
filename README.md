@@ -7,7 +7,7 @@ puts up shows, everyone RSVPs, and visitors can send the owner a message.
 
 | File | What it is |
 | --- | --- |
-| `olezkastheaters.html` | The app, exactly as exported from the Claude artifact. Single file, no build step, no dependencies. |
+| `olezkastheaters.html` | The app, as exported from the Claude artifact. Single file, no build step, no dependencies. |
 | `ANALYSIS.md` | Review of that file: features, bugs, security notes, and what has to change to host it. |
 
 ## Status

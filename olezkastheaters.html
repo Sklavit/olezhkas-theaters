@@ -625,11 +625,11 @@ function viewSettings(){
     <label class="f" for="s_hn">Name of the theatre</label>
     <input id="s_hn" type="text" value="${esc(s.houseName)}" maxlength="34">
     <label class="f" for="s_ac">Owner passcode</label>
-    <input id="s_ac" type="text" value="${esc(s.adminCode)}" maxlength="24">
+    <input id="s_ac" type="password" placeholder="Leave empty to keep the one you have" maxlength="24" autocomplete="new-password">
     <label class="f" for="s_vc">Family passcode</label>
-    <input id="s_vc" type="text" value="${esc(s.visitorCode)}" maxlength="24">
+    <input id="s_vc" type="password" placeholder="Leave empty to keep the one you have" maxlength="24" autocomplete="new-password">
     <div class="row" style="margin-top:20px"><button class="btn solid" data-act="savesettings">Save</button></div>
-    <p class="note">Keep these simple enough to remember. This lock keeps the family sorted into owner and visitors — it is not bank-level security.</p>
+    <p class="note">The passcodes are not shown here. Type a new one to change it, or leave the box empty to keep the one you have. Keep them simple enough to remember. This lock keeps the family sorted into owner and visitors — it is not bank-level security.</p>
   </div>`;
 }
 
@@ -853,8 +853,10 @@ document.addEventListener('click', async (e) => {
 
     case 'savesettings': {
       const houseName = document.getElementById('s_hn').value.trim() || "Olezka's Theaters";
-      const adminCode = document.getElementById('s_ac').value.trim();
-      const visitorCode = document.getElementById('s_vc').value.trim();
+      // Empty means "keep the current one" — the fields start blank so the
+      // codes are never written into the page.
+      const adminCode = document.getElementById('s_ac').value.trim() || state.settings.adminCode;
+      const visitorCode = document.getElementById('s_vc').value.trim() || state.settings.visitorCode;
       if(!adminCode || !visitorCode){ toast('Both passcodes are needed'); return; }
       if(adminCode === visitorCode){ toast('The passcodes must be different'); return; }
       state.settings = { houseName, adminCode, visitorCode };
