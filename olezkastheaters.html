@@ -1,0 +1,885 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Olezka's Theaters</title>
+<style>
+  :root{
+    --bg:#8E1116;
+    --bg2:#5E0A0E;
+    --panel:rgba(0,0,0,.30);
+    --panel2:rgba(0,0,0,.45);
+    --line:rgba(255,255,255,.30);
+    --line2:rgba(255,255,255,.16);
+    --bulb:#FFFFFF;
+    --ink:#FFFFFF;
+    --dim:rgba(255,255,255,.72);
+    --faint:rgba(255,255,255,.45);
+    --display:"Georgia","Iowan Old Style","Times New Roman",serif;
+    --body:"Avenir Next","Segoe UI",system-ui,-apple-system,sans-serif;
+    --mono:"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,.14), transparent 60%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+    background-attachment:fixed;
+    color:var(--ink);
+    font-family:var(--body);
+    font-size:16px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    transition:background-color .5s ease;
+  }
+  button{font:inherit;color:inherit;cursor:pointer}
+  input,textarea,select{font:inherit;color:inherit}
+  h1,h2,h3{margin:0;font-weight:400}
+  a{color:inherit}
+
+  .wrap{max-width:1000px;margin:0 auto;padding:20px 18px 80px}
+
+  /* ---------- marquee sign (signature element) ---------- */
+  .marquee{
+    position:relative;
+    border:3px solid var(--line);
+    border-radius:6px;
+    padding:34px 26px 28px;
+    background:var(--panel2);
+    text-align:center;
+    box-shadow:0 0 0 10px rgba(0,0,0,.14), 0 20px 50px rgba(0,0,0,.35);
+  }
+  .bulbs{position:absolute;inset:-11px;pointer-events:none}
+  .bulb{
+    position:absolute;width:9px;height:9px;border-radius:50%;
+    background:var(--bulb);
+    box-shadow:0 0 8px 2px rgba(255,255,255,.75);
+    animation:flick 2.4s infinite ease-in-out;
+  }
+  @keyframes flick{0%,100%{opacity:1}50%{opacity:.28}}
+  .marquee h1{
+    font-family:var(--display);
+    font-size:clamp(26px,6.2vw,52px);
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    line-height:1.1;
+    text-shadow:0 2px 14px rgba(0,0,0,.5);
+  }
+  .marquee .sub{
+    font-family:var(--mono);
+    font-size:11px;letter-spacing:.32em;text-transform:uppercase;
+    color:var(--faint);margin-top:12px;
+  }
+
+  /* ---------- panels & controls ---------- */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line2);
+    border-radius:8px;
+    padding:20px;
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .grow{flex:1;min-width:0}
+  label.f{display:block;margin:14px 0 6px;font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+  input[type=text],input[type=password],input[type=date],input[type=time],textarea,select{
+    width:100%;padding:11px 13px;
+    background:rgba(0,0,0,.32);
+    border:1px solid var(--line);
+    border-radius:5px;
+    outline:none;
+  }
+  input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,.day:focus-visible{
+    outline:2px solid #fff;outline-offset:2px;
+  }
+  textarea{min-height:96px;resize:vertical}
+  .btn{
+    padding:11px 20px;border:1px solid var(--ink);border-radius:4px;
+    background:transparent;
+    font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    transition:background .16s,color .16s;
+  }
+  .btn:hover{background:var(--ink);color:#111}
+  .btn.solid{background:var(--ink);color:#111}
+  .btn.solid:hover{background:transparent;color:var(--ink)}
+  .btn.small{padding:7px 12px;font-size:11px;letter-spacing:.12em}
+  .btn.ghost{border-color:var(--line2);color:var(--dim)}
+  .btn.ghost:hover{background:rgba(255,255,255,.12);color:var(--ink)}
+
+  /* ---------- top bar ---------- */
+  .topbar{display:flex;align-items:flex-start;gap:14px;padding:6px 0 22px}
+  .brand{font-family:var(--display);font-size:22px;letter-spacing:.05em;text-transform:uppercase}
+  .who{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-top:4px}
+  .splash{
+    background:none;border:0;padding:0;line-height:0;
+    transition:transform .25s ease;
+    filter:drop-shadow(0 3px 8px rgba(0,0,0,.5));
+  }
+  .splash:hover{transform:rotate(-14deg) scale(1.12)}
+
+  .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .tab{
+    padding:8px 15px;border:1px solid var(--line2);border-radius:999px;background:transparent;
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  }
+  .tab[aria-selected=true]{background:var(--ink);color:#111;border-color:var(--ink)}
+  .tab .badge{display:inline-block;margin-left:7px;padding:1px 6px;border-radius:999px;background:rgba(255,255,255,.9);color:#111;font-size:10px}
+  .tab[aria-selected=true] .badge{background:#111;color:#fff}
+
+  /* ---------- calendar ---------- */
+  .calhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .month{font-family:var(--display);font-size:clamp(20px,4vw,30px);letter-spacing:.04em}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .dow{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);text-align:center;padding-bottom:4px}
+  .day{
+    position:relative;min-height:86px;padding:6px;
+    background:rgba(0,0,0,.22);border:1px solid var(--line2);border-radius:5px;
+    text-align:left;overflow:hidden;
+  }
+  .day:hover{border-color:var(--line);background:rgba(0,0,0,.34)}
+  .day.pad{opacity:.28;pointer-events:none}
+  .day.today{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+  .day.sel{background:var(--ink);color:#111}
+  .day.sel .chip{background:rgba(0,0,0,.14);color:#111}
+  .dnum{font-family:var(--mono);font-size:12px;color:var(--dim)}
+  .day.sel .dnum{color:#111}
+  .day.today .dnum{color:var(--ink);font-weight:700}
+  .chip{
+    display:block;margin-top:4px;padding:3px 5px;border-radius:3px;
+    background:rgba(255,255,255,.16);
+    font-size:11px;line-height:1.3;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+
+  /* ---------- ticket stub ---------- */
+  .stub{
+    position:relative;display:flex;gap:0;margin-top:12px;
+    background:var(--panel2);border:1px solid var(--line);border-radius:5px;overflow:hidden;
+  }
+  .stub-time{
+    flex:0 0 92px;padding:14px 10px;text-align:center;
+    border-right:2px dashed var(--line);
+    font-family:var(--mono);
+  }
+  .stub-time .t{font-size:17px;letter-spacing:.04em}
+  .stub-time .d{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-top:4px}
+  .stub-body{flex:1;padding:14px 16px;min-width:0}
+  .stub-body h3{font-family:var(--display);font-size:19px;letter-spacing:.02em}
+  .stub-body p{margin:6px 0 0;color:var(--dim);font-size:14px;white-space:pre-wrap}
+  .stub-acts{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+
+  /* ---------- rsvp ---------- */
+  .rsvp{margin-top:14px;padding-top:13px;border-top:1px dashed var(--line2)}
+  .rsvp-ask{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin-bottom:9px}
+  .rsvp-row{display:flex;gap:8px;flex-wrap:wrap}
+  .pill{
+    min-height:40px;padding:9px 17px;border:1px solid var(--line);border-radius:999px;background:transparent;
+    font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    transition:background .16s,color .16s;
+  }
+  .pill:hover{background:rgba(255,255,255,.15)}
+  .pill.on{background:var(--ink);color:#111;border-color:var(--ink)}
+  .rsvp-sum{margin-top:11px;font-size:13px;color:var(--dim);line-height:1.6}
+  .rsvp-sum strong{color:var(--ink);font-weight:600}
+  .rsvp-sum .sep{color:var(--faint);padding:0 4px}
+
+  .empty{padding:34px 20px;text-align:center;color:var(--dim);border:1px dashed var(--line2);border-radius:6px;margin-top:14px}
+  .empty strong{display:block;font-family:var(--display);font-size:19px;color:var(--ink);margin-bottom:6px}
+
+  /* ---------- colour picker page ---------- */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:22px}
+  .sw{
+    border:2px solid var(--line);border-radius:6px;padding:0;overflow:hidden;background:none;
+    transition:transform .18s;
+  }
+  .sw:hover{transform:translateY(-4px)}
+  .sw[aria-pressed=true]{border-color:var(--ink);box-shadow:0 0 0 4px rgba(255,255,255,.28)}
+  .sw .cap{height:96px;display:block}
+  .sw .nm{
+    padding:11px;font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    background:rgba(0,0,0,.4);
+  }
+
+  /* ---------- messages ---------- */
+  .msg{border:1px solid var(--line2);border-radius:5px;padding:14px 16px;margin-top:10px;background:rgba(0,0,0,.24)}
+  .msg.unread{border-color:var(--ink);background:rgba(0,0,0,.4)}
+  .msg .meta{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .msg p{margin:8px 0 0;white-space:pre-wrap}
+
+  /* ---------- modal ---------- */
+  .veil{position:fixed;inset:0;background:rgba(0,0,0,.68);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}
+  .modal{width:100%;max-width:460px;max-height:90vh;overflow:auto;background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:24px;box-shadow:0 30px 70px rgba(0,0,0,.5)}
+  .modal h2{font-family:var(--display);font-size:24px;letter-spacing:.03em}
+
+  .note{font-size:13px;color:var(--faint);margin-top:10px}
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+    background:var(--ink);color:#111;padding:11px 20px;border-radius:4px;
+    font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;z-index:80;
+  }
+  .center{max-width:520px;margin:8vh auto 0}
+  .hint{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+
+  @media (max-width:620px){
+    .btn.small{min-height:40px;padding:10px 14px}
+    .day{min-height:62px}
+    .chip{font-size:10px}
+    .stub{flex-direction:column}
+    .stub-time{flex:none;border-right:0;border-bottom:2px dashed var(--line);text-align:left;padding:12px 16px;display:flex;gap:10px;align-items:baseline}
+    .stub-time .d{margin-top:0}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+  }
+</style>
+
+<div id="app"></div>
+
+<script>
+/* ============================================================
+   Olezka's Theaters — a family show calendar
+   Built from a handwritten brief. Everything is stored in the
+   artifact's shared storage so the whole family sees the same
+   calendar and the same message inbox.
+   ============================================================ */
+
+const K = {
+  shows:    'theater:shows',
+  messages: 'theater:messages',
+  settings: 'theater:settings',
+  theme:    'theater:theme',
+  session:  'theater:session'
+};
+
+const THEMES = {
+  red:    { bg:'#8E1116', bg2:'#5E0A0E', panel:'rgba(0,0,0,.30)', panel2:'rgba(0,0,0,.45)', label:'Red'    },
+  black:  { bg:'#17171B', bg2:'#0B0B0D', panel:'rgba(255,255,255,.06)', panel2:'rgba(255,255,255,.09)', label:'Black' },
+  yellow: { bg:'#C99400', bg2:'#8E6800', panel:'rgba(0,0,0,.34)', panel2:'rgba(0,0,0,.50)', label:'Yellow' },
+  orange: { bg:'#C25510', bg2:'#8A3A08', panel:'rgba(0,0,0,.30)', panel2:'rgba(0,0,0,.46)', label:'Orange' }
+};
+
+let state = {
+  ready:false,
+  storageOK:true,
+  user:null,              // { name, role: 'admin' | 'visitor' }
+  settings:null,          // { adminCode, visitorCode, houseName }
+  shows:[],
+  messages:[],
+  theme:'red',
+  view:'calendar',        // calendar | colors | messages
+  cursor:new Date(),      // month being shown
+  selected:null,          // 'YYYY-MM-DD'
+  modal:null,             // { kind:'show', show }
+  toast:null
+};
+
+/* ---------- storage helpers ---------- */
+async function load(key, shared, fallback){
+  try{
+    const r = await window.storage.get(key, shared);
+    return r && r.value ? JSON.parse(r.value) : fallback;
+  }catch(e){ return fallback; }
+}
+async function save(key, value, shared){
+  try{
+    const r = await window.storage.set(key, JSON.stringify(value), shared);
+    if(!r) throw new Error('no result');
+    return true;
+  }catch(e){
+    state.storageOK = false;
+    toast('Could not save — check your connection');
+    return false;
+  }
+}
+
+/* ---------- small utilities ---------- */
+const uid = () => Math.random().toString(36).slice(2,10);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+  {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+));
+const pad = n => String(n).padStart(2,'0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const todayISO = () => iso(new Date());
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DOW = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+function prettyDate(isoStr){
+  const [y,m,d] = isoStr.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  return `${DOW[(dt.getDay()+6)%7]} ${d} ${MONTHS[m-1].slice(0,3)}`;
+}
+function prettyTime(t){
+  if(!t) return '--:--';
+  const [h,mi] = t.split(':').map(Number);
+  const ap = h < 12 ? 'am' : 'pm';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${pad(mi)}${ap}`;
+}
+function showsOn(dateISO){
+  return state.shows
+    .filter(s => s.date === dateISO)
+    .sort((a,b) => (a.time||'').localeCompare(b.time||''));
+}
+function upcoming(){
+  const t = todayISO();
+  return state.shows
+    .filter(s => s.date >= t)
+    .sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+}
+const RSVP_OPTS = [['yes','Going'], ['maybe','Maybe'], ['no',"Can't come"]];
+
+function rsvpBlock(show){
+  const r = show.rsvps || {};
+  const mine = r[state.user.name] || null;
+  const who = v => Object.keys(r).filter(k => r[k] === v);
+  const yes = who('yes'), maybe = who('maybe'), no = who('no');
+
+  const parts = [];
+  if(yes.length)   parts.push(`<strong>${yes.length} going</strong> — ${yes.map(esc).join(', ')}`);
+  if(maybe.length) parts.push(`${maybe.length} maybe — ${maybe.map(esc).join(', ')}`);
+  if(no.length)    parts.push(`${no.length} can't come — ${no.map(esc).join(', ')}`);
+
+  const buttons = RSVP_OPTS.map(([v,label]) =>
+    `<button class="pill${mine===v?' on':''}" data-act="rsvp" data-id="${show.id}" data-val="${v}"
+      aria-pressed="${mine===v}">${label}</button>`).join('');
+
+  return `<div class="rsvp">
+    <div class="rsvp-ask">${mine ? 'You replied — tap again to change it' : 'Are you coming?'}</div>
+    <div class="rsvp-row">${buttons}</div>
+    <div class="rsvp-sum">${parts.length ? parts.join('<span class="sep">·</span>') : 'No replies yet'}</div>
+  </div>`;
+}
+
+function toast(msg){
+  state.toast = msg;
+  render();
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { state.toast = null; render(); }, 2400);
+}
+function applyTheme(){
+  const t = THEMES[state.theme] || THEMES.red;
+  const r = document.documentElement.style;
+  r.setProperty('--bg', t.bg);
+  r.setProperty('--bg2', t.bg2);
+  r.setProperty('--panel', t.panel);
+  r.setProperty('--panel2', t.panel2);
+}
+
+/* ---------- boot ---------- */
+async function boot(){
+  state.settings = await load(K.settings, true, null);
+  state.shows    = await load(K.shows, true, []);
+  state.messages = await load(K.messages, true, []);
+  state.theme    = await load(K.theme, false, 'red');
+  state.user     = await load(K.session, false, null);
+  state.selected = todayISO();
+  state.ready    = true;
+  applyTheme();
+  render();
+}
+
+/* ============================================================
+   SCREENS
+   ============================================================ */
+
+function bulbFrame(){
+  let out = '';
+  for(let i = 0; i < 13; i++){
+    const x = (i / 12) * 100;
+    out += `<span class="bulb" style="left:${x}%;top:0;animation-delay:${(i*0.13).toFixed(2)}s"></span>`;
+    out += `<span class="bulb" style="left:${x}%;bottom:0;animation-delay:${(i*0.13+0.6).toFixed(2)}s"></span>`;
+  }
+  for(let i = 1; i < 4; i++){
+    const y = (i / 4) * 100;
+    out += `<span class="bulb" style="left:0;top:${y}%;animation-delay:${(i*0.2).toFixed(2)}s"></span>`;
+    out += `<span class="bulb" style="right:0;top:${y}%;animation-delay:${(i*0.2+0.4).toFixed(2)}s"></span>`;
+  }
+  return `<div class="bulbs" aria-hidden="true">${out}</div>`;
+}
+
+function marqueeSign(){
+  const name = state.settings?.houseName || "Olezka's Theaters";
+  return `<div class="marquee">
+    ${bulbFrame()}
+    <h1>Welcome to<br>${esc(name)}</h1>
+    <div class="sub">Now showing &nbsp;&middot;&nbsp; Family seats only</div>
+  </div>`;
+}
+
+/* --- first run: choose the two passcodes --- */
+function screenSetup(){
+  return `<div class="wrap"><div class="center">
+    ${marqueeSign()}
+    <div class="panel" style="margin-top:26px">
+      <h2 style="font-family:var(--display);font-size:22px">Set up the theatre</h2>
+      <p class="note">This runs once. Pick two passcodes: one for the person who runs the shows, one for everyone else in the family.</p>
+      <label class="f" for="hn">Name of the theatre</label>
+      <input id="hn" type="text" value="Olezka's Theaters" maxlength="34">
+      <label class="f" for="ac">Owner passcode &mdash; adds and changes shows</label>
+      <input id="ac" type="text" placeholder="e.g. 1234" maxlength="24">
+      <label class="f" for="vc">Family passcode &mdash; watches and sends messages</label>
+      <input id="vc" type="text" placeholder="e.g. 9999" maxlength="24">
+      <div class="row" style="margin-top:20px"><button class="btn solid" data-act="setup">Open the theatre</button></div>
+      <p class="note" id="setupErr"></p>
+    </div>
+  </div></div>`;
+}
+
+/* --- login --- */
+function screenLogin(){
+  return `<div class="wrap"><div class="center">
+    ${marqueeSign()}
+    <div class="panel" style="margin-top:26px">
+      <label class="f" for="nm">Your name</label>
+      <input id="nm" type="text" placeholder="Who's arriving?" maxlength="24">
+      <label class="f" for="pc">Passcode</label>
+      <input id="pc" type="password" placeholder="••••" maxlength="24">
+      <div class="row" style="margin-top:20px">
+        <button class="btn solid" data-act="login">Come in</button>
+      </div>
+      <p class="note" id="loginErr"></p>
+    </div>
+  </div></div>`;
+}
+
+/* --- shell --- */
+function paintSplashSVG(){
+  return `<svg width="46" height="46" viewBox="0 0 100 100" aria-hidden="true">
+    <path fill="#fff" d="M52 6c7 0 9 9 14 12s13-3 17 3-4 12-3 18 9 8 8 15-10 7-14 12 1 13-5 16-11-4-17-3-9 10-16 9-6-10-11-14-13-1-16-8 5-11 4-17-8-10-6-17 11-5 16-9 5-12 12-14c6-2 10 -3 17-3z"/>
+    <circle cx="86" cy="24" r="5.5" fill="#fff"/>
+    <circle cx="15" cy="76" r="4" fill="#fff"/>
+    <circle cx="80" cy="82" r="3" fill="#fff"/>
+  </svg>`;
+}
+
+function shell(inner){
+  const unread = state.messages.filter(m => !m.read).length;
+  const isAdmin = state.user.role === 'admin';
+  const tab = (id, label, badge) =>
+    `<button class="tab" role="tab" aria-selected="${state.view===id}" data-act="view" data-view="${id}">
+      ${label}${badge ? `<span class="badge">${badge}</span>` : ''}
+    </button>`;
+
+  return `<div class="wrap">
+    <div class="topbar">
+      <div class="grow">
+        <div class="brand">${esc(state.settings.houseName)}</div>
+        <div class="who">${esc(state.user.name)} &middot; ${isAdmin ? 'Owner' : 'Visitor'} &middot;
+          <button class="btn ghost small" style="margin-left:6px" data-act="logout">Leave</button>
+        </div>
+      </div>
+      <button class="splash" data-act="view" data-view="colors" title="Change the background colour" aria-label="Change the background colour">
+        ${paintSplashSVG()}
+      </button>
+    </div>
+    <div class="tabs" role="tablist">
+      ${tab('calendar','Calendar')}
+      ${tab('messages', isAdmin ? 'Messages' : 'Send a message', isAdmin && unread ? unread : 0)}
+      ${tab('colors','Colour')}
+      ${isAdmin ? tab('settings','Passcodes') : ''}
+    </div>
+    ${inner}
+    ${state.storageOK ? '' : '<p class="note">Saving is not working right now. Anything you change will be lost when this page closes.</p>'}
+  </div>`;
+}
+
+/* --- calendar --- */
+function viewCalendar(){
+  const isAdmin = state.user.role === 'admin';
+  const c = state.cursor;
+  const y = c.getFullYear(), m = c.getMonth();
+  const first = new Date(y, m, 1);
+  const lead = (first.getDay() + 6) % 7;            // Monday-first
+  const days = new Date(y, m+1, 0).getDate();
+  const t = todayISO();
+
+  let cells = '';
+  for(let i = 0; i < lead; i++) cells += `<div class="day pad"></div>`;
+  for(let d = 1; d <= days; d++){
+    const key = `${y}-${pad(m+1)}-${pad(d)}`;
+    const list = showsOn(key);
+    const chips = list.slice(0,2)
+      .map(s => `<span class="chip">${esc(s.title)}</span>`).join('');
+    const more = list.length > 2 ? `<span class="chip">+${list.length-2} more</span>` : '';
+    cells += `<button class="day${key===t?' today':''}${key===state.selected?' sel':''}"
+      data-act="pick" data-date="${key}" aria-label="${prettyDate(key)}, ${list.length} show${list.length===1?'':'s'}">
+      <span class="dnum">${d}</span>${chips}${more}</button>`;
+  }
+
+  const sel = state.selected;
+  const list = sel ? showsOn(sel) : [];
+  let dayPanel = '';
+  if(sel){
+    const stubs = list.map(s => `
+      <div class="stub">
+        <div class="stub-time">
+          <div class="t">${prettyTime(s.time)}</div>
+          <div class="d">${esc(s.place || 'Living room')}</div>
+        </div>
+        <div class="stub-body">
+          <h3>${esc(s.title)}</h3>
+          ${s.notes ? `<p>${esc(s.notes)}</p>` : ''}
+          ${isAdmin ? `<div class="stub-acts">
+            <button class="btn ghost small" data-act="nudge" data-id="${s.id}" data-mins="60">Later 1 hr</button>
+            <button class="btn ghost small" data-act="nudge" data-id="${s.id}" data-mins="1440">Later 1 day</button>
+            <button class="btn ghost small" data-act="edit" data-id="${s.id}">Change</button>
+            <button class="btn ghost small" data-act="del" data-id="${s.id}">Delete</button>
+          </div>` : ''}
+          ${s.date >= t ? rsvpBlock(s) : ''}
+        </div>
+      </div>`).join('');
+
+    dayPanel = `<div class="panel" style="margin-top:18px">
+      <div class="calhead" style="margin:0">
+        <div class="month" style="font-size:20px">${prettyDate(sel)}</div>
+        ${isAdmin ? `<button class="btn small solid" data-act="new" data-date="${sel}">Add a show</button>` : ''}
+      </div>
+      ${list.length ? stubs : `<div class="empty">
+        <strong>Nothing on this day</strong>
+        ${isAdmin ? 'Add a show and it will appear on the calendar.' : 'Check another day, or look at what is coming up below.'}
+      </div>`}
+    </div>`;
+  }
+
+  const next = upcoming().slice(0,3);
+  const nextPanel = next.length ? `<div class="panel" style="margin-top:18px">
+    <div class="month" style="font-size:18px">Coming up</div>
+    ${next.map(s => `<div class="stub">
+      <div class="stub-time">
+        <div class="t">${prettyTime(s.time)}</div>
+        <div class="d">${prettyDate(s.date)}</div>
+      </div>
+      <div class="stub-body"><h3>${esc(s.title)}</h3>${s.notes ? `<p>${esc(s.notes)}</p>` : ''}${rsvpBlock(s)}</div>
+    </div>`).join('')}
+  </div>` : '';
+
+  return `<div class="panel">
+    <div class="calhead">
+      <div class="month">${MONTHS[m]} ${y}</div>
+      <div class="row">
+        <button class="btn ghost small" data-act="month" data-step="-1" aria-label="Previous month">&larr;</button>
+        <button class="btn ghost small" data-act="month" data-step="0">Today</button>
+        <button class="btn ghost small" data-act="month" data-step="1" aria-label="Next month">&rarr;</button>
+      </div>
+    </div>
+    <div class="grid">${DOW.map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div>
+  </div>
+  ${dayPanel}
+  ${nextPanel}`;
+}
+
+/* --- colour picker --- */
+function viewColors(){
+  const sw = key => {
+    const t = THEMES[key];
+    return `<button class="sw" data-act="theme" data-theme="${key}" aria-pressed="${state.theme===key}">
+      <span class="cap" style="background:linear-gradient(160deg, ${t.bg}, ${t.bg2})"></span>
+      <span class="nm">${t.label}</span>
+    </button>`;
+  };
+  return `<div class="panel">
+    <h2 style="font-family:var(--display);font-size:clamp(22px,4.5vw,32px);letter-spacing:.03em">
+      What color background would you like?
+    </h2>
+    <p class="note">The writing always stays white.</p>
+    <div class="swatches">${sw('black')}${sw('yellow')}${sw('red')}${sw('orange')}</div>
+    <p class="note" style="margin-top:22px">Your choice is yours alone — everyone in the family can pick a different one.</p>
+  </div>`;
+}
+
+/* --- messages --- */
+function viewMessages(){
+  if(state.user.role === 'admin'){
+    const msgs = [...state.messages].sort((a,b) => b.at - a.at);
+    return `<div class="panel">
+      <h2 style="font-family:var(--display);font-size:24px">Messages from visitors</h2>
+      ${msgs.length ? msgs.map(m => `<div class="msg${m.read?'':' unread'}">
+        <div class="meta">
+          <span>${esc(m.from)} &middot; ${new Date(m.at).toLocaleString()}</span>
+          <span>
+            ${m.read ? '' : `<button class="btn ghost small" data-act="read" data-id="${m.id}">Mark read</button>`}
+            <button class="btn ghost small" data-act="delmsg" data-id="${m.id}">Delete</button>
+          </span>
+        </div>
+        <p>${esc(m.text)}</p>
+      </div>`).join('') : `<div class="empty">
+        <strong>No messages yet</strong>
+        When someone in the family writes to you, it will land here.
+      </div>`}
+    </div>`;
+  }
+  return `<div class="panel">
+    <h2 style="font-family:var(--display);font-size:24px">Send a message to the owner</h2>
+    <p class="note">Only the owner of the theatre reads these. You cannot change the calendar — that is the owner's job.</p>
+    <label class="f" for="mt">Your message</label>
+    <textarea id="mt" placeholder="Ask for a show, say what you thought of one, request a seat…" maxlength="800"></textarea>
+    <div class="row" style="margin-top:14px"><button class="btn solid" data-act="send">Send</button></div>
+  </div>`;
+}
+
+/* --- passcodes (admin) --- */
+function viewSettings(){
+  const s = state.settings;
+  return `<div class="panel">
+    <h2 style="font-family:var(--display);font-size:24px">Passcodes</h2>
+    <label class="f" for="s_hn">Name of the theatre</label>
+    <input id="s_hn" type="text" value="${esc(s.houseName)}" maxlength="34">
+    <label class="f" for="s_ac">Owner passcode</label>
+    <input id="s_ac" type="password" placeholder="Leave empty to keep the one you have" maxlength="24" autocomplete="new-password">
+    <label class="f" for="s_vc">Family passcode</label>
+    <input id="s_vc" type="password" placeholder="Leave empty to keep the one you have" maxlength="24" autocomplete="new-password">
+    <div class="row" style="margin-top:20px"><button class="btn solid" data-act="savesettings">Save</button></div>
+    <p class="note">The passcodes are not shown here. Type a new one to change it, or leave the box empty to keep the one you have. Keep them simple enough to remember. This lock keeps the family sorted into owner and visitors — it is not bank-level security.</p>
+  </div>`;
+}
+
+/* --- add / change a show --- */
+function modalShow(){
+  const s = state.modal.show;
+  const editing = !!s.id;
+  return `<div class="veil" data-act="close-veil"><div class="modal" role="dialog" aria-modal="true">
+    <h2>${editing ? 'Change the show' : 'Add a show'}</h2>
+    <label class="f" for="m_title">What is it called?</label>
+    <input id="m_title" type="text" value="${esc(s.title)}" maxlength="60" placeholder="The Dragon Play">
+    <div class="row">
+      <div class="grow"><label class="f" for="m_date">Day</label><input id="m_date" type="date" value="${esc(s.date)}"></div>
+      <div class="grow"><label class="f" for="m_time">Time</label><input id="m_time" type="time" value="${esc(s.time)}"></div>
+    </div>
+    <label class="f" for="m_place">Where</label>
+    <input id="m_place" type="text" value="${esc(s.place)}" maxlength="30" placeholder="Living room">
+    <label class="f" for="m_notes">Anything else</label>
+    <textarea id="m_notes" maxlength="500" placeholder="Who is in it, what to bring, how long it is…">${esc(s.notes)}</textarea>
+    <div class="row" style="margin-top:20px">
+      <button class="btn solid" data-act="saveshow">${editing ? 'Save changes' : 'Add it'}</button>
+      <button class="btn ghost" data-act="close">Cancel</button>
+      ${editing ? `<button class="btn ghost" style="margin-left:auto" data-act="del" data-id="${s.id}">Delete</button>` : ''}
+    </div>
+  </div></div>`;
+}
+
+/* ---------- render ---------- */
+function render(){
+  const app = document.getElementById('app');
+  if(!state.ready){ app.innerHTML = `<div class="wrap"><div class="center"><p class="hint">Opening the doors…</p></div></div>`; return; }
+
+  let html;
+  if(!state.settings)      html = screenSetup();
+  else if(!state.user)     html = screenLogin();
+  else {
+    const body = state.view === 'colors'   ? viewColors()
+               : state.view === 'messages' ? viewMessages()
+               : state.view === 'settings' ? viewSettings()
+               : viewCalendar();
+    html = shell(body);
+  }
+  if(state.modal) html += modalShow();
+  if(state.toast) html += `<div class="toast">${esc(state.toast)}</div>`;
+  app.innerHTML = html;
+}
+
+/* ---------- actions ---------- */
+document.addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-act]');
+  if(!el) return;
+  const act = el.dataset.act;
+
+  if(act === 'close-veil' && e.target !== el) return;
+
+  switch(act){
+
+    case 'setup': {
+      const houseName = (document.getElementById('hn').value || "Olezka's Theaters").trim();
+      const adminCode = document.getElementById('ac').value.trim();
+      const visitorCode = document.getElementById('vc').value.trim();
+      const err = document.getElementById('setupErr');
+      if(!adminCode || !visitorCode){ err.textContent = 'Fill in both passcodes to continue.'; return; }
+      if(adminCode === visitorCode){ err.textContent = 'The two passcodes need to be different.'; return; }
+      state.settings = { houseName, adminCode, visitorCode };
+      await save(K.settings, state.settings, true);
+      render();
+      break;
+    }
+
+    case 'login': {
+      const name = document.getElementById('nm').value.trim();
+      const code = document.getElementById('pc').value.trim();
+      const err = document.getElementById('loginErr');
+      if(!name){ err.textContent = 'Type your name first.'; return; }
+      let role = null;
+      if(code === state.settings.adminCode) role = 'admin';
+      else if(code === state.settings.visitorCode) role = 'visitor';
+      if(!role){ err.textContent = 'That passcode does not work. Try again.'; return; }
+      state.user = { name, role };
+      state.view = 'calendar';
+      await save(K.session, state.user, false);
+      render();
+      break;
+    }
+
+    case 'logout':
+      state.user = null;
+      await save(K.session, null, false);
+      render();
+      break;
+
+    case 'view':
+      state.view = el.dataset.view;
+      render();
+      break;
+
+    case 'month': {
+      const step = Number(el.dataset.step);
+      if(step === 0){ state.cursor = new Date(); state.selected = todayISO(); }
+      else state.cursor = new Date(state.cursor.getFullYear(), state.cursor.getMonth() + step, 1);
+      render();
+      break;
+    }
+
+    case 'pick':
+      state.selected = el.dataset.date;
+      render();
+      break;
+
+    case 'new':
+      state.modal = { show:{ id:null, title:'', date:el.dataset.date || todayISO(), time:'17:00', place:'', notes:'' } };
+      render();
+      break;
+
+    case 'edit': {
+      const s = state.shows.find(x => x.id === el.dataset.id);
+      if(s) state.modal = { show:{ ...s } };
+      render();
+      break;
+    }
+
+    case 'saveshow': {
+      const title = document.getElementById('m_title').value.trim();
+      const date  = document.getElementById('m_date').value;
+      if(!title){ toast('Give the show a name'); return; }
+      if(!date){ toast('Pick a day'); return; }
+      const data = {
+        title, date,
+        time:  document.getElementById('m_time').value || '17:00',
+        place: document.getElementById('m_place').value.trim(),
+        notes: document.getElementById('m_notes').value.trim()
+      };
+      const cur = state.modal.show;
+      if(cur.id){
+        state.shows = state.shows.map(s => s.id === cur.id ? { ...s, ...data } : s);
+      }else{
+        state.shows.push({ id:uid(), ...data, by:state.user.name });
+      }
+      state.selected = date;
+      state.cursor = new Date(Number(date.slice(0,4)), Number(date.slice(5,7)) - 1, 1);
+      state.modal = null;
+      await save(K.shows, state.shows, true);
+      toast(cur.id ? 'Show changed' : 'Show added');
+      break;
+    }
+
+    case 'nudge': {
+      const s = state.shows.find(x => x.id === el.dataset.id);
+      if(!s) return;
+      const mins = Number(el.dataset.mins);
+      const [Y,M,D] = s.date.split('-').map(Number);
+      const [h,mi] = (s.time || '17:00').split(':').map(Number);
+      const dt = new Date(Y, M-1, D, h, mi + mins);
+      s.date = iso(dt);
+      s.time = `${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+      state.selected = s.date;
+      state.cursor = new Date(dt.getFullYear(), dt.getMonth(), 1);
+      await save(K.shows, state.shows, true);
+      toast(`Moved to ${prettyDate(s.date)} at ${prettyTime(s.time)}`);
+      break;
+    }
+
+    case 'rsvp': {
+      const id = el.dataset.id, val = el.dataset.val;
+      // Re-read first, so two people replying at once don't wipe each other out.
+      const fresh = await load(K.shows, true, state.shows);
+      const target = fresh.find(x => x.id === id);
+      if(!target){ state.shows = fresh; toast('That show is no longer on'); return; }
+      target.rsvps = target.rsvps || {};
+      const had = target.rsvps[state.user.name];
+      if(had === val) delete target.rsvps[state.user.name];
+      else target.rsvps[state.user.name] = val;
+      state.shows = fresh;
+      await save(K.shows, state.shows, true);
+      const labels = { yes:"You're going", maybe:'Marked as maybe', no:"Marked as can't come" };
+      toast(had === val ? 'Reply removed' : labels[val]);
+      break;
+    }
+
+    case 'del': {
+      const s = state.shows.find(x => x.id === el.dataset.id);
+      if(!s) return;
+      if(!confirm(`Delete "${s.title}"?`)) return;
+      state.shows = state.shows.filter(x => x.id !== s.id);
+      state.modal = null;
+      await save(K.shows, state.shows, true);
+      toast('Show deleted');
+      break;
+    }
+
+    case 'send': {
+      const box = document.getElementById('mt');
+      const text = box.value.trim();
+      if(!text){ toast('Write something first'); return; }
+      state.messages.push({ id:uid(), from:state.user.name, text, at:Date.now(), read:false });
+      box.value = '';
+      await save(K.messages, state.messages, true);
+      toast('Message sent to the owner');
+      break;
+    }
+
+    case 'read':
+      state.messages = state.messages.map(m => m.id === el.dataset.id ? { ...m, read:true } : m);
+      await save(K.messages, state.messages, true);
+      render();
+      break;
+
+    case 'delmsg':
+      state.messages = state.messages.filter(m => m.id !== el.dataset.id);
+      await save(K.messages, state.messages, true);
+      render();
+      break;
+
+    case 'theme':
+      state.theme = el.dataset.theme;
+      applyTheme();
+      await save(K.theme, state.theme, false);
+      render();
+      break;
+
+    case 'savesettings': {
+      const houseName = document.getElementById('s_hn').value.trim() || "Olezka's Theaters";
+      // Empty means "keep the current one" — the fields start blank so the
+      // codes are never written into the page.
+      const adminCode = document.getElementById('s_ac').value.trim() || state.settings.adminCode;
+      const visitorCode = document.getElementById('s_vc').value.trim() || state.settings.visitorCode;
+      if(!adminCode || !visitorCode){ toast('Both passcodes are needed'); return; }
+      if(adminCode === visitorCode){ toast('The passcodes must be different'); return; }
+      state.settings = { houseName, adminCode, visitorCode };
+      await save(K.settings, state.settings, true);
+      toast('Saved');
+      break;
+    }
+
+    case 'close':
+    case 'close-veil':
+      state.modal = null;
+      render();
+      break;
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape' && state.modal){ state.modal = null; render(); }
+  if(e.key === 'Enter' && !state.user){
+    const btn = document.querySelector('[data-act="login"], [data-act="setup"]');
+    if(btn && e.target.tagName === 'INPUT') btn.click();
+  }
+});
+
+boot();
+</script>
