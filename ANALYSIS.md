@@ -1,8 +1,12 @@
-# Analysis — `olezkastheaters.html`
+# Analysis — `public/index.html`
 
-Review of the file as committed (883 lines, verbatim from the Claude artifact).
-Purpose: work out what it is, what it does well, and what has to change before it
-can live on the web as our home website.
+Review of the file as first committed (883 lines, verbatim from the Claude
+artifact). Purpose: work out what it is, what it does well, and what has to change
+before it can live on the web as our home website.
+
+> **Status.** §2 is done — the file is now a proper HTML document, `window.storage`
+> has been replaced with a Netlify Blobs backend, and the app is deployable (see
+> [README.md](README.md)). §3 and §4 still stand, except where marked.
 
 ---
 
@@ -31,7 +35,16 @@ template.
 
 ---
 
-## 2. The blocker: it is not a website yet
+## 2. The blocker: it is not a website yet — *fixed*
+
+> Both problems below are resolved. `load()`/`save()` keep their two-argument
+> shape; `shared:true` now goes to `/api/storage` (Netlify Blobs) and
+> `shared:false` to `localStorage`, which maps cleanly onto the original intent.
+> The file is wrapped in a real document, so it renders in standards mode. A new
+> "The doors are stuck" screen covers the case the artifact never had to handle:
+> the server being unreachable, which must not be mistaken for a brand-new
+> theatre — otherwise an outage would show a stranger the setup screen and let
+> them reset the passcodes. Kept below as the record of why.
 
 Two things stop this file from working if we just drop it on a server.
 

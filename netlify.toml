@@ -1,0 +1,22 @@
+# The site is one static HTML file plus one function, so there is nothing to
+# build. Only public/ is served, which keeps the README and the notes in this
+# repo out of the deployed site; netlify/functions is bundled separately.
+
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    X-Frame-Options = "DENY"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
